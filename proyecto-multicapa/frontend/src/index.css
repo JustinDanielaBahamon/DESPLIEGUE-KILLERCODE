@@ -1,0 +1,250 @@
+:root {
+  --bg: #1b1d21;
+  --bg-panel: #212327;
+  --bg-fila: #26282d;
+  --bg-fila-alt: #2c2e33;
+  --borde: #34363b;
+  --texto: #f1f1f1;
+  --texto-tenue: #a8acb3;
+  --verde: #22c55e;
+  --verde-hover: #16a34a;
+  --rojo: #ef4444;
+  --radio: 8px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--texto);
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.pagina {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.encabezado h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+.encabezado p {
+  color: var(--texto-tenue);
+  margin: 0 0 28px;
+}
+
+.barra-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.btn-primario {
+  background: var(--verde);
+  color: #06210f;
+  border: none;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: var(--radio);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+
+.btn-primario:hover {
+  background: var(--verde-hover);
+}
+
+.btn-primario:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secundario {
+  background: transparent;
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  padding: 10px 18px;
+  border-radius: var(--radio);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-secundario:hover {
+  background: var(--bg-fila);
+}
+
+.input-busqueda {
+  background: var(--bg-panel);
+  border: 1px solid var(--borde);
+  color: var(--texto);
+  padding: 10px 14px;
+  border-radius: var(--radio);
+  min-width: 240px;
+  font-size: 14px;
+}
+
+.input-busqueda:focus {
+  outline: 2px solid var(--verde);
+}
+
+.mensaje-error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid var(--rojo);
+  color: #fecaca;
+  padding: 10px 14px;
+  border-radius: var(--radio);
+  margin-bottom: 16px;
+}
+
+.estado-tabla {
+  color: var(--texto-tenue);
+  padding: 32px 0;
+  text-align: center;
+}
+
+.tabla-motos {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-panel);
+  border-radius: var(--radio);
+  overflow: hidden;
+}
+
+.tabla-motos th {
+  text-align: left;
+  padding: 14px 16px;
+  color: var(--texto-tenue);
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.tabla-motos td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--borde);
+  font-size: 14px;
+}
+
+.tabla-motos tbody tr:nth-child(odd) {
+  background: var(--bg-fila);
+}
+
+.tabla-motos tbody tr:nth-child(even) {
+  background: var(--bg-fila-alt);
+}
+
+.tabla-motos tbody tr:hover {
+  background: #33363c;
+}
+
+.celda-acciones {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-icono {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 4px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.btn-icono:hover {
+  background: var(--borde);
+}
+
+/* ---------- Modal ---------- */
+
+.modal-fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+
+.modal-contenido {
+  background: var(--bg-panel);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.modal-contenido h2 {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+
+.formulario-moto {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.formulario-moto label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--texto-tenue);
+}
+
+.formulario-moto input {
+  background: var(--bg);
+  border: 1px solid var(--borde);
+  color: var(--texto);
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.formulario-moto input:focus {
+  outline: 2px solid var(--verde);
+}
+
+.error-campo {
+  color: #fca5a5;
+  font-size: 12px;
+}
+
+.error-general {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid var(--rojo);
+  color: #fecaca;
+  padding: 10px 14px;
+  border-radius: var(--radio);
+  margin-bottom: 16px;
+}
+
+.formulario-fila {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.formulario-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
