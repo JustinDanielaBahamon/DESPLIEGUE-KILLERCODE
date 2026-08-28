@@ -1,140 +1,136 @@
 #!/usr/bin/env bash
 # ==============================================
-#   🚀 DESPLIEGUE PROYECTO MULTICAPA
-#   🐳 Killercoda + Docker + Spring + React
+#   DESPLIEGUE PARAMETRIZADO - KILLERCODA
+#   Docker + Nginx (opcional) + ngrok (opcional)
 # ==============================================
 #
+# A diferencia de la versión anterior, este script NO tiene
+# datos fijos en el código: todo (nombre del servicio, imagen,
+# puertos, variables de entorno, token de ngrok, etc.) se
+# solicita de forma interactiva en tiempo de ejecución, para
+# que pueda reutilizarse con distintos servicios/parámetros.
+#
 # Uso:
-#   chmod +x deploy-killercoda.sh
-#   ./deploy-killercoda.sh
-#
-# Funciona en dos escenarios, sin configuración extra:
-#   A) Ya tenés el repo clonado y corrés el script desde adentro
-#      (por ejemplo porque hiciste "git clone" del repo completo).
-#      -> No vuelve a clonar nada, usa el checkout donde ya estás.
-#   B) Estás en una sesión nueva de Killercoda sin nada clonado
-#      todavía, y solo bajaste este archivo suelto (con curl).
-#      -> Clona el repo en $HOME/Despliegue.
-#
-# Se puede correr varias veces seguidas sin romper nada:
-# no vuelve a clonar si el repo ya existe, no pisa un .env
-# ya configurado, y siempre valida/corrige el nginx.conf.
+#   chmod +x deploy-killercoda-v2.sh
+#   ./deploy-killercoda-v2.sh
 
 set -euo pipefail
 
-REPO_URL="https://github.com/JustinDanielaBahamon/Despliegue.git"
-FALLBACK_REPO_DIR="$HOME/Despliegue"
-TOTAL_STEPS=8
-
-info()  { echo -e "\n\033[1;36m[$1/${TOTAL_STEPS}] $2\033[0m"; }
+info()  { echo -e "\n\033[1;36m[$1] $2\033[0m"; }
 ok()    { echo -e "   \033[1;32m✅ $1\033[0m"; }
 warn()  { echo -e "   \033[1;33m⚠️  $1\033[0m"; }
 fail()  { echo -e "   \033[1;31m❌ $1\033[0m"; exit 1; }
 
+# Pregunta un dato al usuario, con valor por defecto opcional
+ask() {
+  local __resultvar=$1 __prompt=$2 __default=${3:-} __ans
+  read -rp "   ➜ ${__prompt}${__default:+ [$__default]}: " __ans
+  eval "$__resultvar=\"\${__ans:-$__default}\""
+}
+
 echo "=============================================="
-echo "   🚀 DESPLIEGUE PROYECTO MULTICAPA"
-echo "   🐳 Killercoda + Docker + Spring + React"
+echo "   🚀 DESPLIEGUE PARAMETRIZADO EN KILLERCODA"
 echo "=============================================="
 
-# ── [1/8] Git ────────────────────────────────────
-info 1 "📦 Verificando Git..."
+# ── [1] Verificar dependencias ───────────────────
+info 1 "📦 Verificando Git, Docker y Docker Compose..."
 command -v git >/dev/null 2>&1 || fail "Git no está instalado."
-ok "Git listo ($(git --version))"
-
-# ── [2/8] Docker ─────────────────────────────────
-info 2 "🐳 Verificando Docker..."
 command -v docker >/dev/null 2>&1 || fail "Docker no está instalado."
-ok "Docker: $(docker --version)"
-
-# ── [3/8] Docker Compose plugin ──────────────────
-info 3 "🔧 Verificando Docker Compose..."
 if ! docker compose version >/dev/null 2>&1; then
-  warn "Plugin no encontrado, instalando..."
+  warn "Plugin de Docker Compose no encontrado, instalando..."
   mkdir -p /usr/local/lib/docker/cli-plugins
   curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
     -o /usr/local/lib/docker/cli-plugins/docker-compose
   chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 fi
-ok "Docker Compose: $(docker compose version)"
+ok "Git, Docker y Docker Compose listos"
 
-# ── [4/8] Localizar o clonar el proyecto ─────────
-info 4 "📥 Preparando proyecto..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ── [2] Datos del servicio (solicitados al usuario) ──
+info 2 "🔧 Datos del servicio a desplegar"
+ask NOMBRE_SERVICIO "Nombre del servicio" "proyecto-multicapa"
+ask REPO_URL        "URL del repositorio Git" "https://github.com/JustinDanielaBahamon/Despliegue.git"
+ask REPO_DIR        "Carpeta destino del clonado" "$HOME/$NOMBRE_SERVICIO"
+ask PROJECT_SUBDIR  "Subcarpeta del proyecto dentro del repo (vacío si es la raíz)" "proyecto-multicapa"
+ask PUERTO_FRONTEND "Puerto donde quedará expuesto el servicio/proxy" "3000"
+ask PUERTO_BACKEND  "Puerto interno del backend" "8080"
 
-if git -C "$SCRIPT_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
-  REPO_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
-  ok "Ya estás dentro de un checkout del repo, uso: $REPO_DIR"
-elif [ -d "$FALLBACK_REPO_DIR/.git" ]; then
-  warn "El repo ya existe en $FALLBACK_REPO_DIR, actualizando con git pull..."
-  git -C "$FALLBACK_REPO_DIR" pull --ff-only
-  REPO_DIR="$FALLBACK_REPO_DIR"
-  ok "Repositorio actualizado"
+# ── [3] Variables de entorno del servicio ────────
+info 3 "🔑 Variables de entorno del servicio"
+ask DB_USER          "Usuario de base de datos" "app_user"
+ask DB_PASSWORD      "Contraseña de base de datos" "changeme123"
+ask DB_ROOT_PASSWORD "Contraseña root de base de datos" "rootpass123"
+ask DB_NAME          "Nombre de la base de datos" "app_db"
+
+# ── [4] Clonar o actualizar el repositorio ───────
+info 4 "📥 Preparando el proyecto..."
+if [ -d "$REPO_DIR/.git" ]; then
+  warn "El repositorio ya existe en $REPO_DIR, actualizando con git pull..."
+  git -C "$REPO_DIR" pull --ff-only
 else
-  git clone "$REPO_URL" "$FALLBACK_REPO_DIR"
-  REPO_DIR="$FALLBACK_REPO_DIR"
+  git clone "$REPO_URL" "$REPO_DIR"
   ok "Repositorio clonado en $REPO_DIR"
 fi
-
-PROJECT_DIR="$REPO_DIR/proyecto-multicapa"
-[ -d "$PROJECT_DIR" ] || fail "No se encontró $PROJECT_DIR."
+PROJECT_DIR="$REPO_DIR${PROJECT_SUBDIR:+/$PROJECT_SUBDIR}"
+[ -d "$PROJECT_DIR" ] || fail "No se encontró la carpeta del proyecto: $PROJECT_DIR"
 cd "$PROJECT_DIR"
+ok "Proyecto listo en $PROJECT_DIR"
 
-# ── [5/8] Variables de entorno (.env) ────────────
-info 5 "🔑 Configurando variables de entorno..."
+# ── [5] Generar .env con los datos solicitados ───
+info 5 "📝 Configurando variables de entorno (.env)..."
 if [ -f ".env" ]; then
-  warn ".env ya existe, no se toca (evita pisar credenciales ya usadas)"
+  warn ".env ya existe, no se sobreescribe (evita pisar credenciales ya usadas)"
 else
   cp .env.example .env
   sed -i \
-    -e 's/change_me_user_pass/multicapa123/' \
-    -e 's/change_me_root_pass/root123/' \
-    -e 's|VITE_API_BASE_URL=http://localhost:8080/api|VITE_API_BASE_URL=/api|' \
+    -e "s/change_me_user_pass/${DB_PASSWORD}/" \
+    -e "s/change_me_root_pass/${DB_ROOT_PASSWORD}/" \
+    -e "s|VITE_API_BASE_URL=http://localhost:8080/api|VITE_API_BASE_URL=/api|" \
     .env
-  ok ".env creado a partir de .env.example"
+  ok ".env generado a partir de los datos indicados"
 fi
 
-# ── [6/8] Verificar proxy /api en Nginx ──────────
-info 6 "🌐 Verificando proxy /api en Nginx..."
-if grep -q "proxy_pass http://backend:8080/api/;" frontend/nginx.conf 2>/dev/null; then
-  ok "nginx.conf ya tiene el proxy /api (viene commiteado en el repo)"
-else
-  warn "nginx.conf no tenía el proxy /api, lo corrijo ahora..."
-  cat > frontend/nginx.conf <<'EOF'
+# ── [6] Proxy inverso con Nginx (opcional) ───────
+info 6 "🌐 Proxy inverso con Nginx (opcional)"
+ask USAR_NGINX "¿Configurar Nginx como proxy inverso? (s/n)" "s"
+if [[ "$USAR_NGINX" =~ ^[sS] ]]; then
+  if grep -q "proxy_pass http://backend:${PUERTO_BACKEND}/api/;" frontend/nginx.conf 2>/dev/null; then
+    ok "nginx.conf ya tiene el proxy /api configurado"
+  else
+    warn "Configurando proxy /api en nginx.conf..."
+    cat > frontend/nginx.conf <<EOF
 server {
     listen 80;
     server_name _;
-
     root /usr/share/nginx/html;
     index index.html;
 
-    # Enviar las peticiones /api al backend Spring Boot
     location /api/ {
-        proxy_pass http://backend:8080/api/;
+        proxy_pass http://backend:${PUERTO_BACKEND}/api/;
         proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    # Frontend React + React Router
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files \$uri \$uri/ /index.html;
     }
 }
 EOF
-  ok "nginx.conf corregido"
+    ok "nginx.conf configurado"
+  fi
+else
+  warn "Se omite Nginx: el servicio quedará expuesto directamente en su puerto"
 fi
 
-# ── [7/8] Build y levantar contenedores ──────────
+# ── [7] Construir y levantar contenedores ────────
 info 7 "🏗️  Construyendo y levantando contenedores..."
 docker compose up --build -d
 ok "Contenedores en marcha"
 
-# ── [8/8] Verificación de salud ───────────────────
-info 8 "🩺 Verificando que todo responda..."
-
+# ── [8] Validar que el servicio responda ─────────
+info 8 "🩺 Verificando que el servicio responda..."
 wait_for() {
   local desc="$1" url="$2" tries=0 max=30
   until curl -sf "$url" >/dev/null 2>&1; do
@@ -146,22 +142,48 @@ wait_for() {
   done
   ok "$desc responde ($url)"
 }
+wait_for "Servicio" "http://localhost:${PUERTO_FRONTEND}"
 
-wait_for "Backend"  "http://localhost:8080/api/motos"
-wait_for "Frontend" "http://localhost:3000"
+# ── [9] Publicación externa con ngrok (opcional) ──
+info 9 "🌍 Publicación externa con ngrok (opcional)"
+ask USAR_NGROK "¿Publicar el servicio con ngrok? (s/n)" "n"
+PUBLIC_URL=""
+if [[ "$USAR_NGROK" =~ ^[sS] ]]; then
+  if ! command -v ngrok >/dev/null 2>&1; then
+    warn "ngrok no está instalado, instalando desde el repositorio oficial..."
+    curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+    echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list >/dev/null
+    sudo apt update -qq && sudo apt install -y ngrok
+  fi
 
-echo -e "\n   Probando proxy /api a través del frontend..."
-if curl -s http://localhost:3000/api/motos | grep -q '"marca"'; then
-  ok "El frontend está proxeando /api correctamente al backend"
+  # El token se solicita con -s: no queda visible en pantalla ni en el historial de comandos
+  read -rsp "   ➜ Token de autenticación de ngrok (no se mostrará en pantalla): " NGROK_TOKEN
+  echo
+  [ -n "$NGROK_TOKEN" ] || fail "El token de ngrok es obligatorio para publicar el servicio."
+
+  ngrok config add-authtoken "$NGROK_TOKEN"
+  ngrok http "$PUERTO_FRONTEND" --log=stdout > "$HOME/ngrok_${NOMBRE_SERVICIO}.log" 2>&1 &
+  ok "Túnel de ngrok iniciado hacia el puerto ${PUERTO_FRONTEND}"
+
+  info 9 "⏳ Esperando la URL pública de ngrok..."
+  tries=0
+  until PUBLIC_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*' | head -n1 | cut -d'"' -f4) && [ -n "$PUBLIC_URL" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -ge 15 ] && fail "No se pudo obtener la URL pública de ngrok."
+    sleep 2
+  done
+  ok "Servicio publicado en: $PUBLIC_URL"
 else
-  fail "El frontend responde pero /api/motos no devuelve JSON del backend (revisá nginx.conf dentro del contenedor)"
+  warn "Se omite la publicación con ngrok"
 fi
 
-echo ""
-docker compose ps
+# ── Resumen final ─────────────────────────────────
 echo ""
 echo "=============================================="
 echo "   ✅ DESPLIEGUE COMPLETO"
-echo "   Frontend: http://localhost:3000"
-echo "   Backend:  http://localhost:8080/api/motos"
+echo "   Servicio: $NOMBRE_SERVICIO"
+echo "   Local:    http://localhost:${PUERTO_FRONTEND}"
+if [ -n "$PUBLIC_URL" ]; then
+  echo "   Público:  $PUBLIC_URL"
+fi
 echo "=============================================="
