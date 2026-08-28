@@ -1,4 +1,4 @@
-# Proyecto Multicapa - Despliegue con Docker sobre Linux
+# Despliegue con KILLERCODE
 
 Proyecto de práctica para la actividad del SENA **"Despliegue de una
 aplicación multicapa en Docker sobre Linux"**.
